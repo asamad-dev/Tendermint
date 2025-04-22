@@ -1,16 +1,17 @@
 package main
+
 import (
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"	
-	
+	"syscall"
+
 	"github.com/dgraph-io/badger"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"	
-	
+	"github.com/spf13/viper"
+
 	abci "github.com/tendermint/tendermint/abci/types"
 	cfg "github.com/tendermint/tendermint/config"
 	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
@@ -20,10 +21,13 @@ import (
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/proxy"
 )
+
 var configFile string
+
 func init() {
 	flag.StringVar(&configFile, "config", "$HOME/.tendermint/config/config.toml", "Path to config.toml")
 }
+
 func main() {
 	db, err := badger.Open(badger.DefaultOptions("/tmp/badger"))
 	if err != nil {
@@ -31,23 +35,28 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
-	app := NewKVStoreApplication(db)	
-	flag.Parse()	
+	app := NewKVStoreApplication(db)
+
+	flag.Parse()
+
 	node, err := newTendermint(app, configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v", err)
 		os.Exit(2)
-	}	
+	}
+
 	node.Start()
 	defer func() {
 		node.Stop()
 		node.Wait()
-	}()	
+	}()
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	os.Exit(0)
 }
+
 func newTendermint(app abci.Application, configFile string) (*nm.Node, error) {
 	// read config
 	config := cfg.DefaultConfig()
@@ -61,21 +70,29 @@ func newTendermint(app abci.Application, configFile string) (*nm.Node, error) {
 	}
 	if err := config.ValidateBasic(); err != nil {
 		return nil, errors.Wrap(err, "config is invalid")
-	}	// create logger
+	}
+
+	// create logger
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 	var err error
-	logger, err = tmflags.ParseLogLevel(config.LogLevel, logger, cfg.DefaultLogLevel())
+	logger, err = tmflags.ParseLogLevel(config.LogLevel, logger, cfg.DefaultLogLevel)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse log level")
-	}	// read private validator
+	}
+
+	// read private validator
 	pv := privval.LoadFilePV(
 		config.PrivValidatorKeyFile(),
 		config.PrivValidatorStateFile(),
-	)	// read node key
+	)
+
+	// read node key
 	nodeKey, err := p2p.LoadNodeKey(config.NodeKeyFile())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load node's key")
-	}	// create node
+	}
+
+	// create node
 	node, err := nm.NewNode(
 		config,
 		pv,
@@ -87,6 +104,7 @@ func newTendermint(app abci.Application, configFile string) (*nm.Node, error) {
 		logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new Tendermint node")
-	}	
+	}
+
 	return node, nil
 }
